@@ -1,0 +1,107 @@
+export component Tray inherits SystemTrayIcon {
+    in property <image> status-icon;
+    in property <string> status-tooltip;
+    icon: root.status-icon;
+    tooltip: root.status-tooltip;
+    in property <string> status-line;
+    in property <string> address-line;
+    in property <string> relay-line;
+    in property <string> error-line;
+    /// Daemon is running or starting (so "Stop" is offered instead of "Start").
+    in property <bool> daemon-up;
+    /// Start/Stop may be used right now.
+    in property <bool> can-control;
+    /// Running and idle: commands that need a live daemon are enabled.
+    in property <bool> live;
+    in property <bool> web-ui;
+    /// The daemon's config is readable, so address/relay/WebUI can be edited.
+    in property <bool> daemon-known;
+    in property <bool> has-log;
+    in property <bool> quit-stops-daemon;
+    /// Receives an `Action` id.
+    callback choose(string);
+    /// Left-click on the icon itself.
+    callback tray-clicked();
+    clicked => { root.tray-clicked(); }
+
+    Menu {
+        MenuItem { title: root.status-line; enabled: false; }
+        MenuItem {
+            title: root.daemon-known ? root.address-line + " ✎" : root.address-line;
+            enabled: root.daemon-known;
+            activated => { root.choose("OpenDaemonSettings"); }
+        }
+        MenuItem {
+            title: root.daemon-known ? root.relay-line + " ✎" : root.relay-line;
+            enabled: root.daemon-known;
+            activated => { root.choose("OpenDaemonSettings"); }
+        }
+        if root.error-line != "" : MenuItem { title: root.error-line; enabled: false; }
+        MenuSeparator {}
+        if root.daemon-up : MenuItem {
+            title: "Stop daemon";
+            enabled: root.can-control;
+            activated => { root.choose("Stop"); }
+        }
+        if !root.daemon-up : MenuItem {
+            title: "Start daemon";
+            enabled: root.can-control;
+            activated => { root.choose("Start"); }
+        }
+        MenuItem {
+            title: "Restart daemon";
+            enabled: root.live;
+            activated => { root.choose("Restart"); }
+        }
+        MenuItem {
+            title: "Reload config";
+            enabled: root.live;
+            activated => { root.choose("Reload"); }
+        }
+        if root.web-ui : MenuItem {
+            title: "Open WebUI";
+            enabled: root.live;
+            activated => { root.choose("OpenWebUi"); }
+        }
+        if !root.web-ui && root.daemon-known : MenuItem {
+            title: "Open WebUI (disabled)";
+            enabled: false;
+        }
+        if !root.web-ui && root.daemon-known : MenuItem {
+            title: "Enable WebUI…";
+            activated => { root.choose("EnableWebUi"); }
+        }
+        MenuItem {
+            title: "Pair a device…";
+            enabled: root.live;
+            activated => { root.choose("Pair"); }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: "Set password…";
+            activated => { root.choose("SetPassword"); }
+        }
+        Menu {
+            title: "Configuration";
+            MenuItem {
+                title: "Tray settings…";
+                activated => { root.choose("OpenSettings"); }
+            }
+            MenuItem {
+                title: "Daemon settings…";
+                enabled: root.daemon-known;
+                activated => { root.choose("OpenDaemonSettings"); }
+            }
+            MenuItem {
+                title: "View daemon log";
+                enabled: root.has-log;
+                activated => { root.choose("OpenLog"); }
+            }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: root.quit-stops-daemon ? "Quit and stop daemon" : "Quit";
+            activated => { root.choose("Quit"); }
+        }
+    }
+}

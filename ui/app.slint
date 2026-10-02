@@ -1,0 +1,316 @@
+import { Button, CheckBox, ComboBox, LineEdit, VerticalBox, HorizontalBox, GridBox } from "std-widgets.slint";
+
+export { Tray } from "tray.slint";
+
+component Message inherits Text {
+    in property <bool> error;
+    wrap: word-wrap;
+    color: error ? #e5484d : #8a8f98;
+}
+
+export component PasswordDialog inherits Window {
+    title: "Set daemon password";
+    preferred-width: 360px;
+    preferred-height: 280px;
+    in property <bool> busy;
+    in property <bool> success;
+    in property <bool> daemon-running;
+    in property <string> message;
+    in-out property <string> password;
+    in-out property <string> confirm;
+    callback submit(string, string);
+    callback restart-daemon();
+    callback dismiss();
+
+    VerticalBox {
+        spacing: 10px;
+        if !root.success : VerticalBox {
+            padding: 0;
+            Text { text: "New password"; }
+            LineEdit {
+                input-type: InputType.password;
+                text <=> root.password;
+                enabled: !root.busy;
+            }
+            Text { text: "Confirm password"; }
+            LineEdit {
+                input-type: InputType.password;
+                text <=> root.confirm;
+                enabled: !root.busy;
+                accepted => { root.submit(root.password, root.confirm); }
+            }
+        }
+        Message { text: root.message; error: !root.success; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            if !root.success : Button {
+                text: "Cancel";
+                enabled: !root.busy;
+                clicked => { root.dismiss(); }
+            }
+            if !root.success : Button {
+                text: root.busy ? "Saving…" : "Save";
+                primary: true;
+                enabled: !root.busy;
+                clicked => { root.submit(root.password, root.confirm); }
+            }
+            if root.success && root.daemon-running : Button {
+                text: "Restart daemon now";
+                primary: true;
+                clicked => { root.restart-daemon(); root.dismiss(); }
+            }
+            if root.success : Button {
+                text: root.daemon-running ? "Later" : "Close";
+                clicked => { root.dismiss(); }
+            }
+        }
+    }
+}
+
+export component PairDialog inherits Window {
+    title: "Pair a device";
+    preferred-width: 380px;
+    in property <bool> loading: true;
+    in property <string> message;
+    in property <bool> message-is-error;
+    in property <bool> needs-relay;
+    in property <string> url;
+    in property <image> qr;
+    callback enable-relay();
+    callback dismiss();
+
+    VerticalBox {
+        spacing: 10px;
+        // The QR area and the link row keep their space in every state, so the window
+        // does not change size when the offer arrives.
+        // Children of a plain Rectangle are not laid out: without an explicit size an
+        // Image takes its natural (large) pixel size and overflows.
+        Rectangle {
+            min-height: 300px;
+            max-height: 300px;
+            if root.loading : Text {
+                width: parent.width;
+                height: parent.height;
+                text: "Fetching pairing offer…";
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if !root.loading && root.url != "" : Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.qr;
+                image-fit: contain;
+                image-rendering: pixelated;
+            }
+            if !root.loading && root.url == "" : Message {
+                width: parent.width;
+                height: parent.height;
+                text: root.message;
+                error: root.message-is-error;
+                vertical-alignment: center;
+            }
+        }
+        Text {
+            text: root.url != "" ? "Scan with the Paseo app, or copy the link:" : "";
+            wrap: word-wrap;
+            min-height: 32px;
+            vertical-alignment: center;
+        }
+        LineEdit { text: root.url; read-only: true; enabled: root.url != ""; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            if root.needs-relay : Button {
+                text: "Enable relay";
+                primary: true;
+                enabled: !root.loading;
+                clicked => { root.enable-relay(); }
+            }
+            Button { text: "Close"; clicked => { root.dismiss(); } }
+        }
+    }
+}
+
+export component SettingsDialog inherits Window {
+    title: "Paseo tray settings";
+    preferred-width: 440px;
+    preferred-height: 380px;
+    in property <string> message;
+    in-out property <string> cli-path;
+    in-out property <string> home;
+    in-out property <string> poll-interval;
+    in-out property <bool> auto-start;
+    in-out property <bool> auto-stop;
+    in-out property <bool> launch-at-login;
+    callback save();
+    callback dismiss();
+
+    VerticalBox {
+        spacing: 10px;
+        GridBox {
+            spacing: 8px;
+            Row {
+                Text { text: "paseo CLI path"; vertical-alignment: center; }
+                LineEdit { text <=> root.cli-path; placeholder-text: "empty = search PATH"; }
+            }
+            Row {
+                Text { text: "Daemon home"; vertical-alignment: center; }
+                LineEdit { text <=> root.home; placeholder-text: "empty = ~/.paseo"; }
+            }
+            Row {
+                Text { text: "Poll interval (s)"; vertical-alignment: center; }
+                LineEdit { text <=> root.poll-interval; input-type: InputType.number; }
+            }
+        }
+        CheckBox { text: "Start daemon when the tray launches"; checked <=> root.auto-start; }
+        CheckBox { text: "Stop daemon when the tray quits"; checked <=> root.auto-stop; }
+        CheckBox { text: "Launch tray at login"; checked <=> root.launch-at-login; }
+        if root.message != "" : Message { text: root.message; error: true; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            Button { text: "Cancel"; clicked => { root.dismiss(); } }
+            Button { text: "Save"; primary: true; clicked => { root.save(); } }
+        }
+    }
+}
+
+export struct FieldRow {
+    label: string,
+    hint: string,
+    /// 0 text, 1 checkbox, 2 choice.
+    kind: int,
+    text: string,
+    checked: bool,
+    options: [string],
+    restart: bool,
+}
+
+export struct GroupRow {
+    title: string,
+    fields: [FieldRow],
+}
+
+export component DaemonDialog inherits Window {
+    title: "Paseo daemon settings";
+    preferred-width: 640px;
+    preferred-height: 420px;
+    in property <bool> loading: true;
+    in property <bool> busy;
+    in property <bool> success;
+    /// The configuration could not be read.
+    in property <bool> failed;
+    property <bool> done: root.success || root.failed;
+    in property <bool> restart-needed;
+    in property <string> message;
+    in property <[GroupRow]> groups;
+    in-out property <int> current;
+    /// The model only holds the initial values; Rust mirrors every edit.
+    callback edited(int, int, string, bool);
+    callback save();
+    callback open-config();
+    callback restart-daemon();
+    callback dismiss();
+
+    VerticalBox {
+        spacing: 10px;
+        if root.loading || root.done : Message {
+            text: root.loading ? "Reading the daemon configuration…" : root.message;
+            error: root.failed;
+            vertical-stretch: 1;
+        }
+        if !root.loading && !root.done : HorizontalLayout {
+            spacing: 16px;
+            vertical-stretch: 1;
+            VerticalLayout {
+                width: 110px;
+                spacing: 6px;
+                alignment: start;
+                for group[gi] in root.groups : Button {
+                    text: group.title;
+                    primary: gi == root.current;
+                    clicked => { root.current = gi; }
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                // Every group stays instantiated so edits survive switching tabs.
+                for group[gi] in root.groups : VerticalLayout {
+                    visible: gi == root.current;
+                    alignment: start;
+                    spacing: 10px;
+                    for f[fi] in group.fields : VerticalLayout {
+                        spacing: 2px;
+                        if f.kind == 1 : CheckBox {
+                            text: f.label + (f.restart ? "  ↻" : "");
+                            checked: f.checked;
+                            enabled: !root.busy;
+                            toggled => { root.edited(gi, fi, "", self.checked); }
+                        }
+                        if f.kind != 1 : HorizontalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: f.label + (f.restart ? "  ↻" : "");
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            if f.kind == 0 : LineEdit {
+                                text: f.text;
+                                enabled: !root.busy;
+                                edited(t) => { root.edited(gi, fi, t, false); }
+                            }
+                            if f.kind == 2 : ComboBox {
+                                model: f.options;
+                                current-value: f.text;
+                                enabled: !root.busy;
+                                selected(v) => { root.edited(gi, fi, v, false); }
+                            }
+                        }
+                        if f.hint != "" : Text {
+                            text: f.hint;
+                            wrap: word-wrap;
+                            font-size: 11px;
+                            color: #8a8f98;
+                        }
+                    }
+                }
+            }
+        }
+        if !root.loading && !root.done && root.message != "" : Message { text: root.message; error: true; }
+        HorizontalLayout {
+            spacing: 8px;
+            if !root.done : Text {
+                text: "↻ applies after a daemon restart";
+                font-size: 11px;
+                color: #8a8f98;
+                vertical-alignment: center;
+            }
+            if !root.done : Button {
+                text: "Open config.json";
+                clicked => { root.open-config(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            if !root.done : Button {
+                text: "Cancel";
+                enabled: !root.busy;
+                clicked => { root.dismiss(); }
+            }
+            if !root.done : Button {
+                text: root.busy ? "Saving…" : "Save";
+                primary: true;
+                enabled: !root.busy && !root.loading;
+                clicked => { root.save(); }
+            }
+            if root.success && root.restart-needed : Button {
+                text: "Restart daemon now";
+                primary: true;
+                clicked => { root.restart-daemon(); root.dismiss(); }
+            }
+            if root.done : Button {
+                text: root.restart-needed ? "Later" : "Close";
+                clicked => { root.dismiss(); }
+            }
+        }
+    }
+}

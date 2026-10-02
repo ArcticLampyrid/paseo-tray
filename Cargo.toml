@@ -1,0 +1,34 @@
+[package]
+name = "paseo-tray"
+version = "0.1.0"
+edition = "2021"
+description = "System tray controller for the Paseo daemon"
+license = "GPL-3.0-only"
+
+[dependencies]
+anyhow = "1"
+auto-launch = "0.6"
+bcrypt = "0.19.3"
+ctrlc = { version = "3", features = ["termination"] }
+dirs = "6"
+open = "5"
+qrcode = { version = "0.14", default-features = false }
+resvg = { version = "0.48.1", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+slint = { version = "1.18", default-features = false, features = [
+    "std",
+    "backend-winit",
+    "renderer-software",
+    "compat-1-2",
+    "system-tray",
+    "accessibility",
+] }
+toml = "0.8"
+
+[build-dependencies]
+slint-build = "1.18"
+
+[profile.release]
+lto = true
+strip = true

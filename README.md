@@ -19,8 +19,17 @@ It works through the `paseo` command-line tool, which must be installed.
 
 ## Install
 
-You need a Rust toolchain and a desktop with a system tray (on Linux, one that supports
-StatusNotifierItem, such as KDE Plasma or GNOME with the AppIndicator extension).
+You need a desktop with a system tray (on Linux, one that supports StatusNotifierItem,
+such as KDE Plasma or GNOME with the AppIndicator extension).
+
+On Arch Linux, install [`paseo-tray-git`](https://aur.archlinux.org/packages/paseo-tray-git)
+from the AUR:
+
+```sh
+paru paseo-tray-git
+```
+
+Elsewhere, build from source with a Rust toolchain:
 
 ```sh
 cargo install --path .

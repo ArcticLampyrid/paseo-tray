@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Paseo Tray
+Comment=System tray controller for the Paseo daemon
+Exec=paseo-tray
+Icon=paseo-tray
+Categories=Utility;
+StartupNotify=false
